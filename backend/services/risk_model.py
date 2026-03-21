@@ -34,20 +34,24 @@ def calculate_risk(weather, crop):
         level = "LOW RISK"
 
     forecast = []
-    for i in range(7):
+    for i in range(min(7, len(weather["temperature_max"]))):
         forecast.append({
             "day": f"day_{i+1}",
             "risk": min(100, score + i * 2)
         })
 
     return {
+        "location": weather["location"],
+        "crop": crop,
         "risk": score,
         "risk_level": level,
         "trend": "Risk increasing over next days",
         "factors": {
-            "temperature": temp_avg,
-            "humidity": humidity_avg,
-            "rainfall": rain
+            "temperature": round(temp_avg, 1),
+            "humidity": round(humidity_avg, 1),
+            "rainfall": round(rain, 1),
+            "avg_max_temp_7d": round(sum(weather["temperature_max"][:7]) / min(7, len(weather["temperature_max"])), 1),
+            "avg_min_temp_7d": round(sum(weather["temperature_min"][:7]) / min(7, len(weather["temperature_min"])), 1),
         },
         "main_cause": "High temp + humidity + rainfall",
         "recommendations": [

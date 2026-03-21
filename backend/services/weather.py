@@ -1,16 +1,15 @@
 import requests
 
 def get_weather_data(location: str):
-
     geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1"
     geo_res = requests.get(geo_url).json()
 
-    if "results" not in geo_res:
+    if "results" not in geo_res or not geo_res["results"]:
         return None
 
-    lat = geo_res["results"][0]["latitude"]
-    lon = geo_res["results"][0]["longitude"]
-
+    place = geo_res["results"][0]
+    lat = place["latitude"]
+    lon = place["longitude"]
 
     weather_url = (
         f"https://api.open-meteo.com/v1/forecast?"
@@ -22,9 +21,17 @@ def get_weather_data(location: str):
 
     weather_res = requests.get(weather_url).json()
 
+    if "daily" not in weather_res or "hourly" not in weather_res:
+        return None
+
     return {
-        "latitude": lat,
-        "longitude": lon,
+        "location": {
+            "name": place.get("name"),
+            "country": place.get("country"),
+            "region": place.get("admin1"),
+            "latitude": lat,
+            "longitude": lon,
+        },
         "temperature_max": weather_res["daily"]["temperature_2m_max"],
         "temperature_min": weather_res["daily"]["temperature_2m_min"],
         "precipitation": weather_res["daily"]["precipitation_sum"],
