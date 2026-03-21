@@ -1,18 +1,25 @@
 import { useState } from "react";
+import type { PredictionResponse, PredictionRequest } from "../types/prediction";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 const cropOptions = [
   { value: "maize", label: "Maize" },
   { value: "soybean", label: "Soybean" },
 ];
 
-export default function OnboardingForm() {
+type OnboardingFormProps = {
+  onPredictionSuccess: (data: PredictionResponse) => void;
+};
+
+export default function OnboardingForm({ onPredictionSuccess }: OnboardingFormProps) {
   const [location, setLocation] = useState("");
   const [crop, setCrop] = useState("");
   const [useCurrentConditions, setUseCurrentConditions] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!location.trim() || !crop) {
@@ -23,12 +30,33 @@ export default function OnboardingForm() {
     setError("");
     setLoading(true);
 
-    setTimeout(() => {
+    try {
+      const requestBody: PredictionRequest = {
+        location: location.trim(),
+        crop,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/predict`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Request failed with status ${response.status}`);
+      }
+
+      const data: PredictionResponse = await response.json();
+      onPredictionSuccess(data);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to fetch prediction. Please try again.";
+      setError(errorMessage);
+    } finally {
       setLoading(false);
-      alert(
-        `Prediction requested:\nLocation: ${location}\nCrop: ${crop}\nUse current conditions: ${useCurrentConditions ? "Yes" : "No"}`
-      );
-    }, 1200);
+    }
   };
 
   return (
@@ -59,6 +87,7 @@ export default function OnboardingForm() {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 className="input"
+                disabled={loading}
               />
             </div>
           </div>
@@ -72,6 +101,7 @@ export default function OnboardingForm() {
               value={crop}
               onChange={(e) => setCrop(e.target.value)}
               className="select"
+              disabled={loading}
             >
               <option value="">Select a crop</option>
               {cropOptions.map((option) => (
@@ -95,6 +125,7 @@ export default function OnboardingForm() {
               className={`toggle ${useCurrentConditions ? "active" : ""}`}
               onClick={() => setUseCurrentConditions((prev) => !prev)}
               aria-pressed={useCurrentConditions}
+              disabled={loading}
             >
               <span className="toggle-knob" />
             </button>

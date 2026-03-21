@@ -1,14 +1,10 @@
+import type { PredictionResponse } from "../types/prediction";
+
 type ResultScreenProps = {
+  data: PredictionResponse | null;
   onViewEvolution?: () => void;
+  onBack?: () => void;
 };
-
-const riskValue = 78;
-
-function getRiskLevel(value: number) {
-  if (value >= 70) return "HIGH RISK";
-  if (value >= 40) return "MEDIUM RISK";
-  return "LOW RISK";
-}
 
 function getRiskColor(value: number) {
   if (value >= 70) return "#ef4444";
@@ -16,9 +12,58 @@ function getRiskColor(value: number) {
   return "#10b981";
 }
 
-export default function ResultScreen({ onViewEvolution }: ResultScreenProps) {
-  const riskLabel = getRiskLevel(riskValue);
+function getTrendClass(trend: string) {
+  const lowerTrend = trend.toLowerCase();
+  if (lowerTrend.includes("increasing") || lowerTrend.includes("peak")) return "danger";
+  if (lowerTrend.includes("decreasing") || lowerTrend.includes("stable")) return "success";
+  return "warning";
+}
+
+export default function ResultScreen({ data, onViewEvolution, onBack }: ResultScreenProps) {
+  // Safe fallbacks for all fields
+  const riskValue = data?.risk ?? 0;
+  const riskLabel = data?.risk_level ?? "UNKNOWN";
   const riskColor = getRiskColor(riskValue);
+  const trend = data?.trend ?? "Risk trend unavailable";
+  const trendClass = getTrendClass(trend);
+
+  const temperature = data?.factors?.temperature ?? 0;
+  const humidity = data?.factors?.humidity ?? 0;
+  const rainfall = data?.factors?.rainfall ?? 0;
+
+  const mainCause = data?.main_cause ?? "Unable to determine primary risk driver";
+  const recommendations = data?.recommendations ?? [];
+  const impact = data?.impact ?? "Impact data unavailable";
+  const confidence = data?.confidence ?? 0;
+  const locationName = data?.location?.name ?? "Unknown location";
+  const crop = data?.crop ?? "Unknown crop";
+
+  // Determine temperature note
+  const getTemperatureNote = (temp: number) => {
+    if (temp >= 28) return "Above optimal threshold";
+    if (temp >= 20) return "Within normal range";
+    return "Below optimal threshold";
+  };
+
+  // Determine humidity note
+  const getHumidityNote = (hum: number) => {
+    if (hum >= 70) return "High humidity";
+    if (hum >= 40) return "Moderate humidity";
+    return "Low humidity";
+  };
+
+  // Determine rainfall note
+  const getRainfallNote = (rain: number) => {
+    if (rain >= 10) return "Recent rainfall";
+    if (rain > 0) return "Light rainfall";
+    return "No recent rainfall";
+  };
+
+  // Recommendation icons mapping
+  const getRecommendationIcon = (index: number) => {
+    const icons = ["✅", "👁️", "🕒", "📋", "🌿", "💧"];
+    return icons[index % icons.length];
+  };
 
   return (
     <div className="page">
@@ -28,7 +73,9 @@ export default function ResultScreen({ onViewEvolution }: ResultScreenProps) {
         </div>
 
         <h1 className="title">Risk Analysis Result</h1>
-        <p className="subtitle">Based on current climate conditions</p>
+        <p className="subtitle">
+          {locationName} - {crop.charAt(0).toUpperCase() + crop.slice(1)}
+        </p>
 
         <div className="gauge-section">
           <div
@@ -45,42 +92,48 @@ export default function ResultScreen({ onViewEvolution }: ResultScreenProps) {
               <div className="gauge-label" style={{ color: riskColor }}>
                 {riskLabel}
               </div>
-              <div className="gauge-note">High probability of pest outbreak</div>
+              <div className="gauge-note">
+                {riskValue >= 70
+                  ? "High probability of pest outbreak"
+                  : riskValue >= 40
+                    ? "Moderate risk of pest activity"
+                    : "Low probability of pest outbreak"}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="trend-banner danger">
-          <span className="trend-icon">↗</span>
-          <span>Risk expected to peak in 3–5 days</span>
+        <div className={`trend-banner ${trendClass}`}>
+          <span className="trend-icon">{trend.toLowerCase().includes("increasing") ? "↗" : "→"}</span>
+          <span>{trend}</span>
         </div>
 
         <div className="factors-grid">
           <div className="factor-card">
             <div className="factor-icon">🌡️</div>
             <div className="factor-title">Temperature</div>
-            <div className="factor-value">29°C</div>
-            <div className="factor-note">Above optimal threshold</div>
+            <div className="factor-value">{temperature}°C</div>
+            <div className="factor-note">{getTemperatureNote(temperature)}</div>
           </div>
 
           <div className="factor-card">
             <div className="factor-icon">💧</div>
             <div className="factor-title">Humidity</div>
-            <div className="factor-value">71%</div>
-            <div className="factor-note">High humidity</div>
+            <div className="factor-value">{humidity}%</div>
+            <div className="factor-note">{getHumidityNote(humidity)}</div>
           </div>
 
           <div className="factor-card">
             <div className="factor-icon">🌧️</div>
             <div className="factor-title">Rainfall</div>
-            <div className="factor-value">12 mm</div>
-            <div className="factor-note">Recent rainfall</div>
+            <div className="factor-value">{rainfall} mm</div>
+            <div className="factor-note">{getRainfallNote(rainfall)}</div>
           </div>
         </div>
 
         <div className="cause-card">
           <div className="section-label">Primary Risk Driver</div>
-          <div className="cause-text">High sustained temperature + humidity</div>
+          <div className="cause-text">{mainCause}</div>
         </div>
 
         <div className="recommendations-card">
@@ -88,31 +141,30 @@ export default function ResultScreen({ onViewEvolution }: ResultScreenProps) {
             Recommended Actions (Next 3 Days)
           </div>
 
-          <div className="recommendation-item">
-            <span className="recommendation-icon">✅</span>
-            <span>Apply preventive treatment within 72 hours</span>
-          </div>
-
-          <div className="recommendation-item">
-            <span className="recommendation-icon">👁️</span>
-            <span>Monitor crop every 48 hours</span>
-          </div>
-
-          <div className="recommendation-item">
-            <span className="recommendation-icon">🕒</span>
-            <span>Watch humidity trends closely</span>
-          </div>
+          {recommendations.length > 0 ? (
+            recommendations.map((rec, index) => (
+              <div key={index} className="recommendation-item">
+                <span className="recommendation-icon">{getRecommendationIcon(index)}</span>
+                <span>{rec}</span>
+              </div>
+            ))
+          ) : (
+            <div className="recommendation-item">
+              <span className="recommendation-icon">ℹ️</span>
+              <span>No specific recommendations available</span>
+            </div>
+          )}
         </div>
 
         <div className="impact-card">
           <span className="impact-icon">⚠️</span>
-          <span>Potential yield loss: 30–40% if no intervention is taken</span>
+          <span>{impact}</span>
         </div>
 
         <div className="meta-grid">
           <div className="meta-item">
             <div className="meta-label">Confidence</div>
-            <div className="meta-value">82%</div>
+            <div className="meta-value">{Math.round(confidence * 100)}%</div>
           </div>
 
           <div className="meta-item">
@@ -126,9 +178,15 @@ export default function ResultScreen({ onViewEvolution }: ResultScreenProps) {
           </div>
         </div>
 
-        <button className="submit-btn" onClick={onViewEvolution}>
-          View Risk Evolution (7 Days)
-        </button>
+        <div className="dual-actions">
+          <button className="secondary-btn" onClick={onBack}>
+            New Prediction
+          </button>
+
+          <button className="submit-btn" onClick={onViewEvolution}>
+            View Risk Evolution (7 Days)
+          </button>
+        </div>
       </div>
     </div>
   );

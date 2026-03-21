@@ -1,29 +1,51 @@
+import type { PredictionResponse, ForecastDay } from "../types/prediction";
+
 type SimulationScreenProps = {
+  data: PredictionResponse | null;
   onBack?: () => void;
   onRunAgain?: () => void;
 };
 
-const forecastData = [
-  { day: "Mon", risk: 52 },
-  { day: "Tue", risk: 61 },
-  { day: "Wed", risk: 74 },
-  { day: "Thu", risk: 86 },
-  { day: "Fri", risk: 79 },
-  { day: "Sat", risk: 68 },
-  { day: "Sun", risk: 57 },
+// Default forecast data as fallback
+const defaultForecastData: ForecastDay[] = [
+  { day: "Day 1", risk: 50 },
+  { day: "Day 2", risk: 55 },
+  { day: "Day 3", risk: 60 },
+  { day: "Day 4", risk: 65 },
+  { day: "Day 5", risk: 60 },
+  { day: "Day 6", risk: 55 },
+  { day: "Day 7", risk: 50 },
 ];
 
-const withActionData = [
-  { day: "Mon", risk: 52 },
-  { day: "Tue", risk: 56 },
-  { day: "Wed", risk: 60 },
-  { day: "Thu", risk: 55 },
-  { day: "Fri", risk: 49 },
-  { day: "Sat", risk: 42 },
-  { day: "Sun", risk: 37 },
-];
+function formatForecastDay(dayString: string): string {
+  // If it's already a short format, return as-is
+  if (dayString.length <= 5) return dayString;
+  
+  // Try to parse as date
+  try {
+    const date = new Date(dayString);
+    if (!isNaN(date.getTime())) {
+      return date.toLocaleDateString("en-US", { weekday: "short" });
+    }
+  } catch {
+    // Fall through to return original
+  }
+  return dayString;
+}
 
-function buildPoints(data: { day: string; risk: number }[]) {
+function generateWithActionData(forecastData: ForecastDay[]): ForecastDay[] {
+  // Simulate preventive action reducing risk by ~20-30%
+  return forecastData.map((item, index) => {
+    const reduction = Math.min(0.3, 0.1 + index * 0.03);
+    const reducedRisk = Math.max(20, Math.round(item.risk * (1 - reduction)));
+    return {
+      day: item.day,
+      risk: reducedRisk,
+    };
+  });
+}
+
+function buildPoints(data: ForecastDay[]) {
   const width = 620;
   const height = 260;
   const paddingX = 28;
@@ -34,7 +56,7 @@ function buildPoints(data: { day: string; risk: number }[]) {
     .map((item, index) => {
       const x =
         paddingX +
-        (index * (width - paddingX * 2)) / (data.length - 1);
+        (index * (width - paddingX * 2)) / (data.length - 1 || 1);
       const y =
         height - paddingY - (item.risk / maxRisk) * (height - paddingY * 2);
       return `${x},${y}`;
@@ -42,7 +64,7 @@ function buildPoints(data: { day: string; risk: number }[]) {
     .join(" ");
 }
 
-function buildAreaPath(data: { day: string; risk: number }[]) {
+function buildAreaPath(data: ForecastDay[]) {
   const width = 620;
   const height = 260;
   const paddingX = 28;
@@ -52,11 +74,13 @@ function buildAreaPath(data: { day: string; risk: number }[]) {
   const points = data.map((item, index) => {
     const x =
       paddingX +
-      (index * (width - paddingX * 2)) / (data.length - 1);
+      (index * (width - paddingX * 2)) / (data.length - 1 || 1);
     const y =
       height - paddingY - (item.risk / maxRisk) * (height - paddingY * 2);
     return { x, y };
   });
+
+  if (points.length === 0) return "";
 
   const first = points[0];
   const last = points[points.length - 1];
@@ -71,14 +95,37 @@ function buildAreaPath(data: { day: string; risk: number }[]) {
 }
 
 export default function SimulationScreen({
+  data,
   onBack,
   onRunAgain,
 }: SimulationScreenProps) {
+  // Use real forecast data or fallback
+  const forecastData: ForecastDay[] = data?.forecast?.length
+    ? data.forecast.map((item) => ({
+        day: formatForecastDay(item.day),
+        risk: item.risk,
+      }))
+    : defaultForecastData;
+
+  const withActionData = generateWithActionData(forecastData);
+
   const withoutActionPoints = buildPoints(forecastData);
   const withActionPoints = buildPoints(withActionData);
-
   const withoutActionArea = buildAreaPath(forecastData);
-  const peakDay = "Thu";
+
+  // Find peak day
+  const peakIndex = forecastData.reduce(
+    (maxIdx, item, idx, arr) =>
+      item.risk > arr[maxIdx].risk ? idx : maxIdx,
+    0
+  );
+  const peakDay = forecastData[peakIndex]?.day ?? "N/A";
+  const peakRisk = forecastData[peakIndex]?.risk ?? 0;
+  const peakRiskWithAction = withActionData[peakIndex]?.risk ?? 0;
+  const riskReduction = peakRisk - peakRiskWithAction;
+
+  const locationName = data?.location?.name ?? "Unknown location";
+  const crop = data?.crop ?? "Unknown crop";
 
   return (
     <div className="page">
@@ -88,12 +135,14 @@ export default function SimulationScreen({
         </div>
 
         <h1 className="title">Risk Evolution</h1>
-        <p className="subtitle">Next 7 days forecast</p>
+        <p className="subtitle">
+          {locationName} - {crop.charAt(0).toUpperCase() + crop.slice(1)} | {forecastData.length}-day forecast
+        </p>
 
         <div className="chart-card">
           <div className="chart-header-row">
             <div>
-              <div className="section-label">7-Day Simulation</div>
+              <div className="section-label">{forecastData.length}-Day Simulation</div>
               <div className="chart-title">Projected pest risk trajectory</div>
             </div>
 
@@ -158,28 +207,28 @@ export default function SimulationScreen({
                 />
 
                 {forecastData.map((point, index) => {
-                  const x = 28 + (index * (620 - 56)) / (forecastData.length - 1);
+                  const x = 28 + (index * (620 - 56)) / (forecastData.length - 1 || 1);
                   const y = 260 - 20 - (point.risk / 100) * (260 - 40);
 
                   return (
                     <circle
-                      key={`red-${point.day}`}
+                      key={`red-${index}`}
                       cx={x}
                       cy={y}
-                      r={point.day === peakDay ? 6 : 4}
-                      className={point.day === peakDay ? "peak-point" : "red-point"}
+                      r={index === peakIndex ? 6 : 4}
+                      className={index === peakIndex ? "peak-point" : "red-point"}
                     />
                   );
                 })}
 
                 {withActionData.map((point, index) => {
                   const x =
-                    28 + (index * (620 - 56)) / (withActionData.length - 1);
+                    28 + (index * (620 - 56)) / (withActionData.length - 1 || 1);
                   const y = 260 - 20 - (point.risk / 100) * (260 - 40);
 
                   return (
                     <circle
-                      key={`green-${point.day}`}
+                      key={`green-${index}`}
                       cx={x}
                       cy={y}
                       r={4}
@@ -190,8 +239,8 @@ export default function SimulationScreen({
               </svg>
 
               <div className="chart-x-labels">
-                {forecastData.map((item) => (
-                  <span key={item.day}>{item.day}</span>
+                {forecastData.map((item, index) => (
+                  <span key={index}>{item.day}</span>
                 ))}
               </div>
             </div>
@@ -207,7 +256,7 @@ export default function SimulationScreen({
           <div className="scenario-card danger">
             <div className="section-label">Scenario A</div>
             <div className="scenario-title">Without action</div>
-            <div className="scenario-value red-text">Peak risk: 86%</div>
+            <div className="scenario-value red-text">Peak risk: {peakRisk}%</div>
             <div className="scenario-note">
               Conditions remain highly favorable for pest expansion.
             </div>
@@ -216,7 +265,7 @@ export default function SimulationScreen({
           <div className="scenario-card success">
             <div className="section-label">Scenario B</div>
             <div className="scenario-title">With preventive action</div>
-            <div className="scenario-value green-text">Peak risk: 60%</div>
+            <div className="scenario-value green-text">Peak risk: {peakRiskWithAction}%</div>
             <div className="scenario-note">
               Preventive response reduces spread and stabilizes risk.
             </div>
@@ -228,12 +277,12 @@ export default function SimulationScreen({
 
           <div className="recommendation-item">
             <span className="recommendation-icon">📉</span>
-            <span>Preventive action reduces projected peak risk by 26 points</span>
+            <span>Preventive action reduces projected peak risk by {riskReduction} points</span>
           </div>
 
           <div className="recommendation-item">
             <span className="recommendation-icon">💰</span>
-            <span>Potential yield preserved: +25% compared to no intervention</span>
+            <span>Potential yield preserved: +{Math.round(riskReduction * 0.8)}% compared to no intervention</span>
           </div>
 
           <div className="recommendation-item">
@@ -250,12 +299,12 @@ export default function SimulationScreen({
 
           <div className="meta-item">
             <div className="meta-label">Reduction</div>
-            <div className="meta-value">-35%</div>
+            <div className="meta-value">-{Math.round((riskReduction / peakRisk) * 100) || 0}%</div>
           </div>
 
           <div className="meta-item">
             <div className="meta-label">Forecast</div>
-            <div className="meta-value">7 Days</div>
+            <div className="meta-value">{forecastData.length} Days</div>
           </div>
         </div>
 
