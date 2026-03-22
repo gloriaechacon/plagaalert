@@ -34,14 +34,6 @@ The application is composed of two main parts:
    - Risk evolution simulation
 
 ---
-
-## Project Structure
-project-root/
-│
-├── frontend/ # React + Vite app
-├── backend/ # FastAPI API
-└── README.md
-
 ## Deployment
 
 The project is designed to be deployed as two independent services:
