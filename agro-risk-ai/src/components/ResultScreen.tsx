@@ -1,4 +1,5 @@
 import type { PredictionResponse } from "../types/prediction";
+import DashboardCardHeader from "./DashboardCardHeader";
 
 type ResultScreenProps = {
   data: PredictionResponse | null;
@@ -20,7 +21,6 @@ function getTrendClass(trend: string) {
 }
 
 export default function ResultScreen({ data, onViewEvolution, onBack }: ResultScreenProps) {
-  // Safe fallbacks for all fields
   const riskValue = data?.risk ?? 0;
   const riskLabel = data?.risk_level ?? "UNKNOWN";
   const riskColor = getRiskColor(riskValue);
@@ -38,28 +38,28 @@ export default function ResultScreen({ data, onViewEvolution, onBack }: ResultSc
   const locationName = data?.location?.name ?? "Unknown location";
   const crop = data?.crop ?? "Unknown crop";
 
-  // Determine temperature note
+  const aiInsight =
+    (data as PredictionResponse & { ai_insight?: string })?.ai_insight ??
+    "AI-generated agronomic insight will appear here once Gemini is connected. For now, this prediction is based on real climate data and our internal risk engine.";
+
   const getTemperatureNote = (temp: number) => {
     if (temp >= 28) return "Above optimal threshold";
     if (temp >= 20) return "Within normal range";
     return "Below optimal threshold";
   };
 
-  // Determine humidity note
   const getHumidityNote = (hum: number) => {
     if (hum >= 70) return "High humidity";
     if (hum >= 40) return "Moderate humidity";
     return "Low humidity";
   };
 
-  // Determine rainfall note
   const getRainfallNote = (rain: number) => {
     if (rain >= 10) return "Recent rainfall";
     if (rain > 0) return "Light rainfall";
     return "No recent rainfall";
   };
 
-  // Recommendation icons mapping
   const getRecommendationIcon = (index: number) => {
     const icons = ["✅", "👁️", "🕒", "📋", "🌿", "💧"];
     return icons[index % icons.length];
@@ -68,14 +68,10 @@ export default function ResultScreen({ data, onViewEvolution, onBack }: ResultSc
   return (
     <div className="page">
       <div className="card result-card">
-        <div className="icon-wrapper">
-          <span className="icon">🌱</span>
-        </div>
-
-        <h1 className="title">Risk Analysis Result</h1>
-        <p className="subtitle">
-          {locationName} - {crop.charAt(0).toUpperCase() + crop.slice(1)}
-        </p>
+        <DashboardCardHeader
+          title="Risk Analysis Result"
+          subtitle={`${locationName} — ${crop.charAt(0).toUpperCase() + crop.slice(1)}`}
+        />
 
         <div className="gauge-section">
           <div
@@ -136,6 +132,11 @@ export default function ResultScreen({ data, onViewEvolution, onBack }: ResultSc
           <div className="cause-text">{mainCause}</div>
         </div>
 
+        <div className="cause-card">
+          <div className="section-label">AI Insight</div>
+          <div className="cause-text">{aiInsight}</div>
+        </div>
+
         <div className="recommendations-card">
           <div className="recommendations-title">
             Recommended Actions (Next 3 Days)
@@ -174,7 +175,7 @@ export default function ResultScreen({ data, onViewEvolution, onBack }: ResultSc
 
           <div className="meta-item">
             <div className="meta-label">Model</div>
-            <div className="meta-value">AI risk model v2.3</div>
+            <div className="meta-value">Risk engine + AI layer</div>
           </div>
         </div>
 

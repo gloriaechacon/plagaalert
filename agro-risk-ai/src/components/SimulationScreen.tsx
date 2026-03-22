@@ -1,4 +1,5 @@
 import type { PredictionResponse, ForecastDay } from "../types/prediction";
+import DashboardCardHeader from "./DashboardCardHeader";
 
 type SimulationScreenProps = {
   data: PredictionResponse | null;
@@ -6,7 +7,6 @@ type SimulationScreenProps = {
   onRunAgain?: () => void;
 };
 
-// Default forecast data as fallback
 const defaultForecastData: ForecastDay[] = [
   { day: "Day 1", risk: 50 },
   { day: "Day 2", risk: 55 },
@@ -18,23 +18,19 @@ const defaultForecastData: ForecastDay[] = [
 ];
 
 function formatForecastDay(dayString: string): string {
-  // If it's already a short format, return as-is
   if (dayString.length <= 5) return dayString;
   
-  // Try to parse as date
   try {
     const date = new Date(dayString);
     if (!isNaN(date.getTime())) {
       return date.toLocaleDateString("en-US", { weekday: "short" });
     }
   } catch {
-    // Fall through to return original
   }
   return dayString;
 }
 
 function generateWithActionData(forecastData: ForecastDay[]): ForecastDay[] {
-  // Simulate preventive action reducing risk by ~20-30%
   return forecastData.map((item, index) => {
     const reduction = Math.min(0.3, 0.1 + index * 0.03);
     const reducedRisk = Math.max(20, Math.round(item.risk * (1 - reduction)));
@@ -113,7 +109,6 @@ export default function SimulationScreen({
   const withActionPoints = buildPoints(withActionData);
   const withoutActionArea = buildAreaPath(forecastData);
 
-  // Find peak day
   const peakIndex = forecastData.reduce(
     (maxIdx, item, idx, arr) =>
       item.risk > arr[maxIdx].risk ? idx : maxIdx,
@@ -130,14 +125,10 @@ export default function SimulationScreen({
   return (
     <div className="page">
       <div className="card simulation-card">
-        <div className="icon-wrapper">
-          <span className="icon">📈</span>
-        </div>
-
-        <h1 className="title">Risk Evolution</h1>
-        <p className="subtitle">
-          {locationName} - {crop.charAt(0).toUpperCase() + crop.slice(1)} | {forecastData.length}-day forecast
-        </p>
+        <DashboardCardHeader
+          title="Risk Evolution"
+          subtitle={`${locationName} — ${crop.charAt(0).toUpperCase() + crop.slice(1)} · ${forecastData.length}-day forecast`}
+        />
 
         <div className="chart-card">
           <div className="chart-header-row">
